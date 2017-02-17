@@ -4,11 +4,22 @@
 	<meta charset="UTF-8">
 	<meta name="csrf-token" content="{!! csrf_token() !!}">
 	<title>FACEBOOK</title>
+
+
+	<script src="{!!asset('public')!!}/js/jquery-2.1.1.js"></script>
+	<script src="{!!asset('public')!!}/js/textcounter.min.js"></script>
+	<script src="{!!asset('public')!!}/js/html2canvas.js"></script>
+	<script src="{!!asset('public')!!}/js/jquery.validate.min.js"></script>
+	<script src="{!!asset('public')!!}/js/base64binary.js"></script>
+
+
+
 	<script>
 	  window.fbAsyncInit = function() {
 	    FB.init({
 	      appId      : '{!!env("FACEBOOK_APP_ID")!!}',
 	      cookie      : true,
+			// xfbml  : true,
 	      version    : 'v2.8'
 	    });
 	    FB.AppEvents.logPageView();
@@ -25,17 +36,15 @@
 
 	<script type="text/javascript">
 		function checkLoginState(){
-			FB.getLoginStatus(des,picture,function(response) {
+			FB.getLoginStatus(function(response) {
 			  if (response.status === 'connected') {
 			    // console.log(response.authResponse.accessToken);
-			    post(des);
-
-
+			    post();
 			  } else if (response.status === 'not_authorized') {
 			   		console.log('not authenticated app');
 			  } else {
 			    login();
-			    post(des);
+			    post();
 			  }
 			});
 		}
@@ -56,13 +65,11 @@
 			});
 		}
 
-		function post(des,picture){
+		function post(){
 			FB.ui({
 			  method: 'feed',
 			  display: 'popup',
 			  caption: 'Letter from future',
-			  description: des,
-			  picture:picture,
 			  link : 'http://ansonvn.com/testfb/test',
 			  redirect_uri: '{!!url("done")!!}'
 
@@ -73,22 +80,86 @@
 
 		function login(){
 			FB.login(function(respone){
-				console.log(response);
+				// console.log(response);
 			},{scope: 'email,publish_actions'})
 		}
 
 		function getPicture(){
 			FB.api('me/picture',function(response){
-				console.log(response.data.url);
+				// console.log(response.data.url);
 			})
 		}
 
+	
+
+	// Convert a data URI to blob
+	function dataURItoBlob(dataURI) {
+	    var byteString = atob(dataURI.split(',')[1]);
+	    var ab = new ArrayBuffer(byteString.length);
+	    var ia = new Uint8Array(ab);
+	    for (var i = 0; i < byteString.length; i++) {
+	        ia[i] = byteString.charCodeAt(i);
+	    }
+	    return new Blob([ab], {
+	        type: 'image/png'
+	    });
+	}
+
+	function postImageToFacebook(token, filename, mimeType, imageData, message) {
+	    var fd = new FormData();
+	    fd.append("access_token", token);
+	    fd.append("source", imageData);
+	    fd.append("no_story", true);
+
+	    // Upload image to facebook without story(post to feed)
+	    $.ajax({
+	        url: "https://graph.facebook.com/me/photos?access_token=" + token,
+	        type: "POST",
+	        data: fd,
+	        processData: false,
+	        contentType: false,
+	        cache: false,
+	        success: function (data) {
+	            console.log("success: ", data);
+
+	            // Get image source url
+	            FB.api(
+	                "/" + data.id + "?fields=images",
+	                function (response) {
+	                    if (response && !response.error) {
+	                        //console.log(response.images[0].source);
+
+	                        // Create facebook post using image
+							FB.ui({
+							  method: 'feed',
+							  display: 'popup',
+							  name: filename,
+							  caption: 'Letter from future',
+							  description: message,
+							  picture: response.images[0].source,
+							  link : 'http://ansonvn.com/testfb/test',
+
+							}, function(response){
+								console.log(response);
+							});
+	                    }
+	                }
+	            );
+	        },
+	        error: function (shr, status, data) {
+	            console.log("error " + data + " Status " + shr.status);
+	        },
+	        complete: function (data) {
+	            console.log('Post to facebook Complete');
+	            // window.location = "{!!url('done')!!}"
+	        }
+	    });
+	}
+
+
 	</script>
-	<script src="{!!asset('public')!!}/js/jquery-2.1.1.js"></script>
-	<script src="{!!asset('public')!!}/js/textcounter.min.js"></script>
-	<script src="{!!asset('public')!!}/js/html2canvas.js"></script>
-	<script src="{!!asset('public')!!}/js/jquery.validate.min.js"></script>
 	<script>
+		
 		$(document).ready(function(){
 			var getCanvas;
 			$('textarea[name="letter"]').textcounter({
@@ -115,13 +186,28 @@
 							var element = $('#preview');
 							html2canvas(element, {
 						        onrendered: function (canvas) {
-									getCanvas = canvas.toDataURL('image/png');
-									// console.log(abc);
+								  var dataimg = canvas.toDataURL("image/png");
+									try {
+									    blob = dataURItoBlob(dataimg);
+									} catch (e) {
+									    console.log(e);
+									}
+									FB.getLoginStatus(function (response) {
+										if (response.status === "connected") {
+										postImageToFacebook(response.authResponse.accessToken, "Letter From Future", "image/png", blob, message);
+										} else if (response.status === "not_authorized") {
+										FB.login(function (response) {
+										postImageToFacebook(response.authResponse.accessToken, "Letter From Future", "image/png", blob, message);
+										}, {scope: "publish_actions"});
+										} else {
+										FB.login(function (response) {
+										postImageToFacebook(response.authResponse.accessToken, "Letter From Future", "image/png", blob, message);
+										}, {scope: "publish_actions"});
+										}
+									});
 								}
 				         	});
 				         	$('#preview').hide();
-				         	checkLoginState(message,getCanvas);
-
 						}
 					})
 				}
@@ -197,11 +283,16 @@
 			outline: none;
 			cursor: pointer;
 		}
+		#preview{
+			width:600px;
+			height:315px;
+		}
 
 	</style>
 </head>
 
 <body>
+
 	<div class="wrap">
 		<form action="" method="POST" class="form-letter">
 			{!!Form::token()!!}
