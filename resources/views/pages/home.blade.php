@@ -49,21 +49,21 @@
 			});
 		}
 
-		function getPictureAjax(){
-			FB.getLoginStatus(function(response) {
-			  if (response.status === 'connected') {
-			    // console.log(response.authResponse.accessToken);
-			    getPicture();
+		// function getPictureAjax(){
+		// 	FB.getLoginStatus(function(response) {
+		// 	  if (response.status === 'connected') {
+		// 	    // console.log(response.authResponse.accessToken);
+		// 	    getPicture();
 
 
-			  } else if (response.status === 'not_authorized') {
-			   		console.log('not authenticated app');
-			  } else {
-			    login();
-			    getPicture();
-			  }
-			});
-		}
+		// 	  } else if (response.status === 'not_authorized') {
+		// 	   		console.log('not authenticated app');
+		// 	  } else {
+		// 	    login();
+		// 	    getPicture();
+		// 	  }
+		// 	});
+		// }
 
 		function post(){
 			FB.ui({
@@ -85,7 +85,7 @@
 		}
 
 		function getPicture(){
-			FB.api('me/picture',function(response){
+			FB.api('me/picture?type=large',function(response){
 				// console.log(response.data.url);
 			})
 		}
@@ -120,8 +120,7 @@
 	        contentType: false,
 	        cache: false,
 	        success: function (data) {
-	            console.log("success: ", data);
-
+	            // console.log("success: ", data);
 	            // Get image source url
 	            FB.api(
 	                "/" + data.id + "?fields=images",
@@ -140,7 +139,11 @@
 							  link : 'http://ansonvn.com/testfb/test',
 
 							}, function(response){
-								console.log(response);
+								if(typeof response !== 'undefined'){
+									console.log('Shared');
+								}else{
+									console.log('you must share');
+								}
 							});
 	                    }
 	                }
@@ -150,7 +153,7 @@
 	            console.log("error " + data + " Status " + shr.status);
 	        },
 	        complete: function (data) {
-	            console.log('Post to facebook Complete');
+	            // 	console.log('Post to facebook Complete');
 	            // window.location = "{!!url('done')!!}"
 	        }
 	    });
@@ -161,7 +164,6 @@
 	<script>
 		
 		$(document).ready(function(){
-			var getCanvas;
 			$('textarea[name="letter"]').textcounter({
 				type: 'word',
 				countDown: true,
@@ -173,43 +175,72 @@
 					var from = $('input[name="from"]').val();
 					var message = $('textarea[name="letter"]').val();
 
-					getPictureAjax();
-					$.ajax({
-						url:'{!!url("send/ajax")!!}',
-						type:'POST',
-						data:{x:from,y:message, _token:$("meta[name='csrf-token']").attr("content")},
-						success:function(data){
-							// console.log(data.rs);
-							$('#preview').html(data.rs);
+					// getPictureAjax();
+					FB.getLoginStatus(function(response) {
+					  if (response.status === 'connected') {
+					    FB.api('me/picture',function(response){
+							// console.log(response.data.url);
+							var img_avatar = response.data.url;
+						});
+							$.ajax({
+								url:'{!!url("send/ajax")!!}',
+								type:'POST',
+								data:{x:from,y:message, _token:$("meta[name='csrf-token']").attr("content")},
+								success:function(data){
+									// console.log(data.rs);
+									$('#preview').html(data.rs);
 
-							/*RENDER IMAGE*/
-							var element = $('#preview');
-							html2canvas(element, {
-						        onrendered: function (canvas) {
-								  var dataimg = canvas.toDataURL("image/png");
-									try {
-									    blob = dataURItoBlob(dataimg);
-									} catch (e) {
-									    console.log(e);
-									}
-									FB.getLoginStatus(function (response) {
-										if (response.status === "connected") {
-										postImageToFacebook(response.authResponse.accessToken, "Letter From Future", "image/png", blob, message);
-										} else if (response.status === "not_authorized") {
-										FB.login(function (response) {
-										postImageToFacebook(response.authResponse.accessToken, "Letter From Future", "image/png", blob, message);
-										}, {scope: "publish_actions"});
-										} else {
-										FB.login(function (response) {
-										postImageToFacebook(response.authResponse.accessToken, "Letter From Future", "image/png", blob, message);
-										}, {scope: "publish_actions"});
-										}
-									});
+									/*RENDER IMAGE*/
+									var element = $('#preview');
+									element.show();
+									html2canvas(element, {
+								        onrendered: function (canvas) {
+										  var dataimg = canvas.toDataURL("image/png");
+											try {
+											    blob = dataURItoBlob(dataimg);
+											} catch (e) {
+											    console.log(e);
+											}
+											postImageToFacebook(response.authResponse.accessToken, "Letter From Future", "image/png", blob, message);										}
+						         	});
+						         	element.hide();
 								}
-				         	});
-				         	$('#preview').hide();
-						}
-					})
+							});
+					  } else if (response.status === 'not_authorized') {
+					   		console.log('not authenticated app');
+					  } else {
+					  	FB.login(function(response){
+					  		FB.api('me/picture',function(response){
+								// console.log(response.data.url);
+								var img_avatar = response.data.url;
+							});
+							$.ajax({
+								url:'{!!url("send/ajax")!!}',
+								type:'POST',
+								data:{x:from,y:message, _token:$("meta[name='csrf-token']").attr("content")},
+								success:function(data){
+									// console.log(data.rs);
+									$('#preview').html(data.rs);
+
+									/*RENDER IMAGE*/
+									var element = $('#preview');
+									element.show();
+									html2canvas(element, {
+								        onrendered: function (canvas) {
+										  var dataimg = canvas.toDataURL("image/png");
+											try {
+											    blob = dataURItoBlob(dataimg);
+											} catch (e) {
+											    console.log(e);
+											}
+											postImageToFacebook(response.authResponse.accessToken, "Letter From Future", "image/png", blob, message);										}
+						         	});
+						         	element.hide();
+								}
+							});
+					  	},{scope: "publish_actions,email,manage_pages,ads_management,pages_show_list"});
+					  }
+					});
 				}
 			})
 		})
@@ -286,6 +317,7 @@
 		#preview{
 			width:600px;
 			height:315px;
+			display: none
 		}
 
 	</style>
